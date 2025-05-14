@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Blogs</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      height: 100vh;
+    }
+    .container {
+      width: 100%;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 20px;
+    }
+    .scroll-box {
+      background: #fff;
+      height: 320px;
+      overflow-x: auto;
+      white-space: nowrap;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .blog-list {
+      display: flex;
+      flex-direction: row;
+      gap: 20px;
+    }
+    .blog-card {
+      width: 250px;
+      flex-shrink: 0;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      overflow: hidden;
+      transition: 0.3s ease;
+    }
+    .blog-card:hover {
+      transform: translateY(-5px);
+    }
+    .blog-title {
+      font-size: 18px;
+      color: #333;
+      margin: 10px;
+    }
+    .blog-content {
+      color: #666;
+      font-size: 14px;
+      margin: 0 10px 10px 10px;
+      line-height: 1.4;
+    }
+    .no-blogs, .loading-text {
+      text-align: center;
+      color: #999;
+      font-size: 16px;
+      margin-top: 15px;
+    }
+
+    .skeleton-card {
+      width: 250px;
+      height: 300px;
+      flex-shrink: 0;
+      border-radius: 10px;
+      background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+      background-size: 400% 100%;
+      animation: shimmer 1.2s infinite;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: -400px 0; }
+      100% { background-position: 400px 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>All Blogs</h1>
+
+    <div id="scrollBox" class="scroll-box">
+      <div id="blogs" class="blog-list">
+        <!-- Blogs will be appended here -->
+      </div>
+    </div>
+
+    <p id="loading" class="loading-text" style="display:none;">Loading more blogs...</p>
+    <p id="noMoreBlogs" class="no-blogs" style="display: none;">No more blogs to load.</p>
+  </div>
+
+<script>
+  const blogsContainer = document.getElementById('blogs');
+  const loading = document.getElementById('loading');
+  const noMoreBlogs = document.getElementById('noMoreBlogs');
+  const scrollBox = document.getElementById('scrollBox');
+
+  let lastCreatedAt = null;
+  let loadingMore = false;
+  let hasMore = true;
+  const limit = 6;
+
+  function showSkeletons(count) {
+    for (let i = 0; i < count; i++) {
+      const skeleton = document.createElement('div');
+      skeleton.className = 'skeleton-card';
+      skeleton.setAttribute('data-skeleton', 'true');
+      blogsContainer.appendChild(skeleton);
+    }
+  }
+
+  function removeSkeletons() {
+    const skeletons = blogsContainer.querySelectorAll('[data-skeleton="true"]');
+    skeletons.forEach(s => s.remove());
+  }
+
+  async function loadBlogs() {
+    if (loadingMore || !hasMore) return;
+
+    loadingMore = true;
+    showSkeletons(limit);
+
+    try {
+      let url = `http://localhost:8200/blogs?limit=${limit}`;
+      if (lastCreatedAt) {
+        url += `&lastCreatedAt=${encodeURIComponent(lastCreatedAt)}&direction=forward`;
+      }
+
+      const res = await fetch(url); // <-- make sure this is implemented on backend
+      const result = await res.json();
+      console.log(result);
+
+      removeSkeletons();
+
+      if (result.success && result.data.blogs.length > 0) {
+        result.data.blogs.forEach(blog => {
+          const blogCard = document.createElement('div');
+          blogCard.className = 'blog-card';
+          blogCard.innerHTML = `
+            <img src="${blog.BlogImage || blog.thumbnail}" alt="Blog Image" style="width:100%; height:150px; object-fit:cover;">
+            <div class="blog-title">${blog.Title}</div>
+            <div class="blog-content">${blog.Description.substring(0, 80)}...</div>
+          `;
+          blogsContainer.appendChild(blogCard);
+        });
+
+        lastCreatedAt = result.data.blogs[result.data.blogs.length - 1]._id;
+        hasMore = result.data.hasMore;
+        if (!hasMore) noMoreBlogs.style.display = 'block';
+      } else {
+        hasMore = false;
+        noMoreBlogs.style.display = 'block';
+      }
+    } catch (error) {
+      console.error('Error fetching blogs:', error);
+      removeSkeletons();
+    } finally {
+      loadingMore = false;
+    }
+  }
+
+  // Initial load
+  loadBlogs();
+
+  // Horizontal infinite scroll
+  scrollBox.addEventListener('scroll', () => {
+    if (scrollBox.scrollLeft + scrollBox.clientWidth >= scrollBox.scrollWidth - 100) {
+      loadBlogs();
+    }
+  });
+</script>
+
+</body>
+</html>
